@@ -1,0 +1,1 @@
+# FastAPI Websocket for live dashboard
