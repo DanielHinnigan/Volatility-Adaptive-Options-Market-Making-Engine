@@ -6,16 +6,23 @@ from datetime import datetime
 from typing import Dict, List
 import time
 
+from ..storage.base import StorageBackend
 from .base_connector import DataConnector, OptionQuote
+from ..storage.parquet_storage import ParquetStorage
 
 class YFinanceConnector(DataConnector):
     """Data connector using yfinance"""
     
-    def __init__(self, symbol: str = "SPY"):
+    def __init__(self, symbol: str = "SPY", storage: StorageBackend = None):
         self.symbol = symbol
         self.ticker = yf.Ticker(symbol)
         self._last_request_time = 0
         self._min_interval = 0.01  # 10ms delay to avoid rate limits
+        
+        # Storage defaults to Parquet (backwards compatible)
+        if storage is None:
+            storage = ParquetStorage()
+        self.storage = storage
     
     def _rate_limit(self):
         """Avoid hitting Yahoo's rate limits"""
@@ -36,16 +43,24 @@ class YFinanceConnector(DataConnector):
             print(f"Failed to fetch expiries: {e}")
             return []
     
-    def get_chain_for_expiry(self, expiry: str) -> Dict[str, List[OptionQuote]]:
+    def get_chain_for_expiry(self, expiry: str, use_cache: bool = True) -> Dict[str, List[OptionQuote]]:
         """
         Fetches the full option chain for a specific expiry.
         Returns: {'calls': [OptionQuote, ...], 'puts': [OptionQuote, ...]}
         """
+        if use_cache and self.storage.expiry_exists(self.symbol, expiry):
+            return self.storage.load_expiry(self.symbol, expiry)
+
         self._rate_limit()
         try:
+            # Parse data from yfinance to our own format
             chain = self.ticker.option_chain(expiry)
             calls = self._parse_df(chain.calls, "call")
             puts = self._parse_df(chain.puts, "put")
+
+            # Save the chain
+            self.storage.save_expiry(self.symbol, expiry, calls, puts)
+
             return {"calls": calls, "puts": puts}
         except Exception as e:
             print(f"Failed to fetch chain for {expiry}: {e}")
