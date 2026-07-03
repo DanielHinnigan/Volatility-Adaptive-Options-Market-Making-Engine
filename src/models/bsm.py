@@ -44,7 +44,7 @@ def black_scholes_put(S, K, T, r, q, sigma) -> float:
     return K * np.exp(-r * T) * norm_cdf(-d2) - S * np.exp(-q * T) * norm_cdf(-d1)
 
 @jit(nopython=True, cache=True)
-def implied_volatility(price, S, K, T, r, q, guess=0.2, max_iter=100, tol=1e-6):
+def implied_volatility(price, S, K, T, r, q, option_type, guess=0.2, max_iter=100, tol=1e-6):
     """
     Newton-Raphson inversion of BSM Call Price to Implied Volatility.
     Returns IV or NaN if inversion fails.
@@ -53,7 +53,12 @@ def implied_volatility(price, S, K, T, r, q, guess=0.2, max_iter=100, tol=1e-6):
     """
     sigma = abs(guess)
     for i in range(max_iter):
-        price_est = black_scholes_call(S, K, T, r, q, sigma)
+        if option_type == "call":
+            price_est = black_scholes_call(S, K, T, r, q, sigma)
+        elif option_type == "put":
+            price_est = black_scholes_put(S, K, T, r, q, sigma)
+        else:
+            print("Need to raise error")
         vega = S * np.exp(-q * T) * np.sqrt(T) * norm_pdf(
             (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         )

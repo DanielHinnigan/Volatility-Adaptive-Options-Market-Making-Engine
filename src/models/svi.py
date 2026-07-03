@@ -8,7 +8,7 @@ def svi_total_variance(k, a, b, rho, m, sigma):
 
 def svi_iv(k, a, b, rho, m, sigma, T):
     """Raw SVI Implied Volatility."""
-    return np.sqrt(svi_total_variance(k, a, b, rho, m, sigma) / max(T, 1/365))
+    return np.sqrt(svi_total_variance(k, a, b, rho, m, sigma) / T)
 
 def calibrate_raw_svi(k_values, iv_values, T):
     """

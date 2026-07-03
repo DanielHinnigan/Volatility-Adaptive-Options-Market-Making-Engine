@@ -9,10 +9,11 @@ import time
 from ..storage.base import StorageBackend
 from .base_connector import DataConnector, OptionQuote
 from ..storage.parquet_storage import ParquetStorage
+from ..utils.time_utils import compute_time_to_expiry
+from ..models.bsm import implied_volatility
 
 class YFinanceConnector(DataConnector):
     """Data connector using yfinance"""
-    
     def __init__(self, symbol: str = "SPY", storage: StorageBackend = None):
         self.symbol = symbol
         self.ticker = yf.Ticker(symbol)
@@ -55,8 +56,8 @@ class YFinanceConnector(DataConnector):
         try:
             # Parse data from yfinance to our own format
             chain = self.ticker.option_chain(expiry)
-            calls = self._parse_df(chain.calls, "call")
-            puts = self._parse_df(chain.puts, "put")
+            calls = self._parse_df(chain.calls, "call", expiry)
+            puts = self._parse_df(chain.puts, "put", expiry)
 
             # Save the chain
             self.storage.save_expiry(self.symbol, expiry, calls, puts)
@@ -66,12 +67,14 @@ class YFinanceConnector(DataConnector):
             print(f"Failed to fetch chain for {expiry}: {e}")
             return {"calls": [], "puts": []}
     
-    def _parse_df(self, df: pd.DataFrame, option_type: str) -> List[OptionQuote]:
+    def _parse_df(self, df: pd.DataFrame, option_type: str, expiry: str) -> List[OptionQuote]:
         """Convert yfinance DataFrame to your standardized format."""
         quotes = []
         
         # yfinance often has columns: 'strike', 'bid', 'ask', 'impliedVolatility', 'volume', 'openInterest'
         # Note: yfinance uses 'impliedVolatility' but it's sometimes stale.
+        spot = self.get_spot_price()
+        T = compute_time_to_expiry(expiry)
         for _, row in df.iterrows():
             strike = row.get('strike')
             bid = row.get('bid', 0.0)
@@ -83,11 +86,10 @@ class YFinanceConnector(DataConnector):
             
             mid = (bid + ask) / 2
             iv = row.get('impliedVolatility', np.nan)
-            
+
             # If yfinance didn't provide IV, we will compute it later in the pipeline.
-            # For now, pass NaN and let your BSM inversion handle it.
             if pd.isna(iv) or iv <= 0:
-                iv = np.nan
+                iv = implied_volatility(mid, spot, strike, T, 0.05, 0, option_type)
 
             # yfinance defines zero volume as NaN, so we must convert into zero
             volume = row.get("volume")
@@ -101,14 +103,33 @@ class YFinanceConnector(DataConnector):
                 bid=float(bid),
                 ask=float(ask),
                 mid=float(mid),
-                implied_vol=float(iv) if not pd.isna(iv) else 0.0,
+                implied_vol=iv,
                 volume=volume,
-                open_interest=int(row.get('openInterest', 0)),
+                open_interest=int(row.get('openInterest')),
                 option_type=option_type
             ))
         # Sort by strike for cleaner surface fitting
         return sorted(quotes, key=lambda x: x.strike)
     
+    def get_spot_price(self) -> float:
+        """
+        Fetch the latest closing/current price for the underlying.
+    
+        Returns:
+            float: Current spot price.
+        
+        Raises:
+            ValueError: If yfinance fails to fetch the price or returns an empty DataFrame.
+        """
+        hist = self.ticker.history(period="1d")
+        if hist.empty:
+            raise ValueError(
+            f"Failed to fetch spot price for {self.symbol} from yfinance. "
+            "The history DataFrame is empty. Check your internet connection, "
+            "the symbol ticker, or yfinance's availability."
+        )
+        return float(hist['Close'].iloc[-1])
+
     def get_surface_data(self, max_expiries: int = 5) -> Dict:
         """
         High-level method to fetches the N nearest expiries. 
@@ -124,23 +145,21 @@ class YFinanceConnector(DataConnector):
             }
         }
         """
+        # Fetch expiries
         expiries = self.get_available_expiries()
         if not expiries:
             return {}
         
         # Take the nearest N expiries
         expiries = expiries[:max_expiries]
-        
+
         # Get current spot price (from underlying stock)
-        hist = self.ticker.history(period="1d")
-        spot = hist['Close'].iloc[-1] if not hist.empty else 0.0
+        spot = self.get_spot_price()
         
         result = {}
         for exp_str in expiries:
-            exp_date = datetime.strptime(exp_str, "%Y-%m-%d")
-            days_to_exp = (exp_date - datetime.now()).days
-            T = max(days_to_exp / 365.0, 1/365.0)  # Minimum 1 day
-            
+            T = compute_time_to_expiry(exp_str)
+
             chain_data = self.get_chain_for_expiry(exp_str)
             if chain_data["calls"] or chain_data["puts"]:
                 result[exp_str] = {
