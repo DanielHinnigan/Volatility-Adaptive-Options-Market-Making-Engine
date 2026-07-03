@@ -17,7 +17,7 @@ class YFinanceConnector(DataConnector):
         self.symbol = symbol
         self.ticker = yf.Ticker(symbol)
         self._last_request_time = 0
-        self._min_interval = 0.01  # 10ms delay to avoid rate limits
+        self._min_interval = 0.01  # 10ms delay to avoid rate limits. The delay may be set to a lower value
         
         # Storage defaults to Parquet (backwards compatible)
         if storage is None:

@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11.9"
 dependencies = [
+    "fastparquet>=2026.5.0",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
     "pydantic>=2.13.4",

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -6,8 +7,15 @@ from .base import StorageBackend
 from ..data.base_connector import OptionQuote
 
 class ParquetStorage(StorageBackend):
-    def __init__(self, cache_dir: str = "data/cache"):
-        self.cache_dir = cache_dir
+    def __init__(self, cache_dir: str = None):
+        if cache_dir is None:
+            # Set the cache_dir to the root node of the project (storage->src->root)
+            current_file = Path(__file__).resolve()
+            project_root = current_file.parent.parent.parent
+
+            self.cache_dir = project_root / "data" / "cache"
+        else:
+            self.cache_dir = Path(cache_dir)
         os.makedirs(self.cache_dir, exist_ok=True)
     
     def _get_path(self, symbol: str, expiry: str) -> str:
