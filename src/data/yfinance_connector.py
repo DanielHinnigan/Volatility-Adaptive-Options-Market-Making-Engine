@@ -88,7 +88,8 @@ class YFinanceConnector(DataConnector):
                 mid=float(mid),
                 implied_vol=float(iv) if not pd.isna(iv) else 0.0,
                 volume=volume,
-                open_interest=int(row.get('openInterest', 0))
+                open_interest=int(row.get('openInterest', 0)),
+                option_type=option_type
             ))
         # Sort by strike for cleaner surface fitting
         return sorted(quotes, key=lambda x: x.strike)

@@ -2,7 +2,7 @@
 # Provides abstraction such that any other module can be agnostic w.r.t the connector used.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, Literal
 from dataclasses import dataclass
 
 @dataclass
@@ -15,6 +15,7 @@ class OptionQuote:
     implied_vol: float
     volume:int
     open_interest:int
+    option_type: Literal['call', 'put']
 
 class DataConnector(ABC):
     @abstractmethod
