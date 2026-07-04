@@ -58,7 +58,9 @@ def implied_volatility(price, S, K, T, r, q, option_type, guess=0.2, max_iter=10
         elif option_type == "put":
             price_est = black_scholes_put(S, K, T, r, q, sigma)
         else:
-            print("Need to raise error")
+            raise ValueError(
+            f"option_type = {option_type} is not valid. Need to be either 'call' or 'put'"
+            )
         vega = S * np.exp(-q * T) * np.sqrt(T) * norm_pdf(
             (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         )
