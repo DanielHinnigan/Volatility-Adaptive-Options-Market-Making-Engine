@@ -15,8 +15,12 @@ def calibrate_raw_svi(k_values, iv_values, T):
     Calibrate Raw SVI for one expiry.
     k_values: log-moneyness array
     iv_values: market implied volatilities
-    T: time-to-expiry in years
+    T: time-to-expiry in y-ears
     """
+    # Empty arrays return none
+    if len(k_values) == 0 or len(iv_values) == 0:
+        return None
+
     # Initial guess (heuristic)
     atm_idx = np.argmin(np.abs(k_values))
     atm_iv = iv_values[atm_idx]
