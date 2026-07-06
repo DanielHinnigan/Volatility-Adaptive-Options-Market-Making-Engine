@@ -76,6 +76,7 @@ class YFinanceConnector(DataConnector):
         spot = self.get_spot_price()
         T = compute_time_to_expiry(expiry)
         for _, row in df.iterrows():
+
             strike = row.get('strike')
             bid = row.get('bid', 0.0)
             ask = row.get('ask', 0.0)
