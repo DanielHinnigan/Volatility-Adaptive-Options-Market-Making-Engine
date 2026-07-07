@@ -43,8 +43,8 @@ def filter_otm_for_calibration(
             continue  # ITM call -> discard
         if opt.option_type == 'put' and opt.strike >= forward:
             continue  # ITM put -> discard
-        
+
         filtered_strikes.append(opt.strike)
         filtered_ivs.append(opt.implied_vol)
-    
+
     return np.array(filtered_strikes), np.array(filtered_ivs)
