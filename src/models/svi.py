@@ -31,6 +31,8 @@ def calibrate_raw_svi(k_values, iv_values, T):
     rho_init = -0.3
     m_init = 0.0
     sigma_init = 0.1
+
+
     
     def objective(params):
         a, b, rho, m, sigma = params
@@ -61,10 +63,21 @@ def calibrate_raw_svi(k_values, iv_values, T):
             (None, None),   # m unconstrained
             (1e-6, None)    # sigma > 0
         ],
-        options={'maxiter': 500, 'ftol': 1e-8}
+        options={'maxiter': 1000, 'ftol': 1e-4}
+    )
+
+    # If SLSQP fails, use the more robust Nelder-Mead minimizer
+    if result.success:
+        return result.x
+    
+    result_nm = minimize(
+        objective,
+        x0=[a_init, b_init, rho_init, m_init, sigma_init],
+        method='Nelder-Mead',
+        options={'maxiter': 1000, 'ftol': 1e-4}
     )
     
-    return result.x if result.success else None
+    return result_nm.x if result_nm.success else None
 
 @dataclass
 class SVICalibrationResult:
