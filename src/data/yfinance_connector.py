@@ -5,12 +5,16 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List
 import time
+import logging
 
 from ..storage.base import StorageBackend
 from .base_connector import DataConnector, OptionQuote
 from ..storage.parquet_storage import ParquetStorage
 from ..utils.time_utils import compute_time_to_expiry
 from ..models.bsm import implied_volatility
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 class YFinanceConnector(DataConnector):
     """Data connector using yfinance"""
@@ -41,7 +45,7 @@ class YFinanceConnector(DataConnector):
             # yfinance returns strings like '2025-12-19'
             return expiries
         except Exception as e:
-            print(f"Failed to fetch expiries: {e}")
+            logger.error(f"Failed to fetch expiries: {e}", exc_info=True)
             return []
     
     def get_chain_for_expiry(self, expiry: str, use_cache: bool = True) -> Dict[str, List[OptionQuote]]:
@@ -64,7 +68,7 @@ class YFinanceConnector(DataConnector):
 
             return {"calls": calls, "puts": puts}
         except Exception as e:
-            print(f"Failed to fetch chain for {expiry}: {e}")
+            logger.error(f"Failed to fetch chain for {expiry}: {e}", exc_info=True)
             return {"calls": [], "puts": []}
     
     def _parse_df(self, df: pd.DataFrame, option_type: str, expiry: str) -> List[OptionQuote]:
@@ -106,7 +110,7 @@ class YFinanceConnector(DataConnector):
                 mid=float(mid),
                 implied_vol=iv,
                 volume=volume,
-                open_interest=int(row.get('openInterest')),
+                open_interest=int(row.get('openInterest', 0) if not np.nan else 0),
                 option_type=option_type
             ))
         # Sort by strike for cleaner surface fitting
