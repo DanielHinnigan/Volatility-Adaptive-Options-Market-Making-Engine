@@ -1,1 +1,0 @@
-# Optimal spread calculation & quoting bid-ask prices
