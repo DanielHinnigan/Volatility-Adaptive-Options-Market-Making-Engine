@@ -150,7 +150,7 @@ class PricingEngine:
             try:
                 with self._lock:
                     self._calibrate()
-                logger.info("Background recalibration completed successfully.")
+                logger.debug("Background recalibration completed successfully.")
             except Exception as e:
                 logger.error(f"Background recalibration failed: {e}", exc_info=True)
 
@@ -167,7 +167,7 @@ class PricingEngine:
             4. Fit SSVI globally.
             5. Fit SABR per expiry (calibrated to SSVI surface).
         """
-        logger.info(f"Calibrating surface for {self.symbol}...")
+        logger.debug(f"Calibrating surface for {self.symbol}...")
 
         # 1. Fetch data
         expiries = self._connector.get_available_expiries()
