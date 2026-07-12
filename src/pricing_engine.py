@@ -4,7 +4,7 @@ import time
 import copy
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from .models.ssvi import calibrate_ssvi, ssvi_iv
 from .models.sabr import calibrate_sabr, sabr_iv
 from .utils.time_utils import compute_time_to_expiry
 from .utils.data_preprocessing import filter_otm_for_calibration
+from .config import settings as global_settings
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -43,8 +44,8 @@ class PricingEngine:
     def __init__(
         self,
         symbol: str,
-        r: float = 0.045,
-        q: float = 0.012,
+        r: Optional[float] = None,
+        q: Optional[float] = None,
         max_expiries: int = 5,
         data_provider: str = "yfinance",
         cache: bool = True,
@@ -75,6 +76,10 @@ class PricingEngine:
             self._connector = ConnectorFactory.get_connector(
                 provider=data_provider,
             )
+
+        # Use provided values or fall back to global settings
+        self.r = r if r is not None else global_settings.R
+        self.q = q if q is not None else global_settings.Q
 
         # Internal state (protected by a lock)
         self._lock = threading.RLock()
@@ -145,7 +150,7 @@ class PricingEngine:
             try:
                 with self._lock:
                     self._calibrate()
-                logger.info("Background recalibration completed successfully.")
+                logger.debug("Background recalibration completed successfully.")
             except Exception as e:
                 logger.error(f"Background recalibration failed: {e}", exc_info=True)
 
@@ -162,7 +167,7 @@ class PricingEngine:
             4. Fit SSVI globally.
             5. Fit SABR per expiry (calibrated to SSVI surface).
         """
-        logger.info(f"Calibrating surface for {self.symbol}...")
+        logger.debug(f"Calibrating surface for {self.symbol}...")
 
         # 1. Fetch data
         expiries = self._connector.get_available_expiries()
