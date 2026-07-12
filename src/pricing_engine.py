@@ -87,6 +87,7 @@ class PricingEngine:
         self._ssvi_params: Dict[str, float] = {}     # {'rho': ..., 'eta': ..., 'gamma': ...}
         self._sabr_params: Dict[str, Dict] = {}      # expiry -> {'alpha': ..., 'rho': ..., 'nu': ..., 'beta': 0.5}
         self._surface_ready = False
+        self._shutdown_requested = False            # flag for graceful shutdown
 
         # Spot price management
         self._spot: Optional[float] = None
@@ -129,15 +130,39 @@ class PricingEngine:
 
 
     def stop_background_calibration(self) -> None:
-        """Stops the background recalibration thread safely."""
+        """
+        Stops the background recalibration thread gracefully.
+
+        Gives the thread up to 3 seconds to finish its current operation.
+        If it doesn't stop, logs a warning and leaves it as a daemon.
+        """
         if not self._running:
+            logger.info("No background calibration thread running.")
             return
+
         logger.info("Stopping background calibration thread...")
         self._running = False
-        if self._thread and self._thread.is_alive():
+        self._shutdown_requested = True  # Signal to break out of long operations
+
+        # Give the thread up to 3 attempts (1 second each) to finish
+        attempts = 3
+        for attempt in range(attempts):
+            if self._thread is None or not self._thread.is_alive():
+                break
+            logger.debug(f"Waiting for thread to finish (attempt {attempt+1}/{attempts})...")
             self._thread.join(timeout=1.0)
+
+        # Check if the thread is still alive after attempts
+        if self._thread is not None and self._thread.is_alive():
+            logger.warning(
+                "Background thread did not stop after 3 attempts. "
+                "It will continue running as a daemon and will exit when the program exits. "
+                "The thread reference is kept to prevent a new thread from being started."
+            )
+        else:
             self._thread = None
-        logger.info("Background calibration thread stopped.")
+            self._shutdown_requested = False
+            logger.info("Background calibration thread stopped.")
 
     def is_background_running(self) -> bool:
         """Returns true if background (calibration) thread is running, otherwise returns false."""
@@ -147,6 +172,11 @@ class PricingEngine:
         """Daemon loop: sleeps, then recalibrates."""
         while self._running:
             time.sleep(self._interval_ms / 1000.0)
+
+            # Check if stop_background_calibration() has been called.
+            if not self._running or self._shutdown_requested:
+                break
+
             try:
                 with self._lock:
                     self._calibrate()
@@ -167,6 +197,10 @@ class PricingEngine:
             4. Fit SSVI globally.
             5. Fit SABR per expiry (calibrated to SSVI surface).
         """
+        if self._shutdown_requested:
+            logger.debug("Calibration aborted: shutdown requested.")
+            return
+
         logger.debug(f"Calibrating surface for {self.symbol}...")
 
         # 1. Fetch data

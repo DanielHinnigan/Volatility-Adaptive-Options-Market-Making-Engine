@@ -309,6 +309,7 @@ class LucicTseQuotingEngine:
     def stop_background_update(self) -> None:
         """Stops the background update thread safely."""
         if not self._running:
+            logger.info("No background calibration thread running.")
             return
 
         logger.info("Stopping background update thread...")
