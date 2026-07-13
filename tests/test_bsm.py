@@ -19,5 +19,5 @@ class TestBSM:
     def test_iv_inversion(self):
         S, K, T, r, q, sigma = 100, 100, 1.0, 0.05, 0.02, 0.20
         price = black_scholes_call(S, K, T, r, q, sigma)
-        iv = implied_volatility(price, S, K, T, r, q)
+        iv = implied_volatility(price, S, K, T, r, q, "call")
         assert iv == pytest.approx(sigma, abs=1e-6)
