@@ -57,6 +57,18 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Constants
+# ============================================================================
+
+TENOR_BUCKETS = {
+    "0-7D": 7,
+    "8-30D": 30,
+    "30-60D": 60,
+    "60-90D": 90,
+    "90D+": float('inf'),  # Catch-all for anything > 90 days
+}
+
+# ============================================================================
 # Data Containers
 # ============================================================================
 
@@ -780,17 +792,13 @@ class LucicTseQuotingEngine:
 
     # Fine for now - can be improved by making adjustable by user.
     def _get_tenor_bucket(self, T: float) -> str:
+        """Returns the tenor bucket for a given time-to-expiry in years."""
         days = T * 365
-        if days <= 7:
-            return "0-7D"
-        elif days <= 30:
-            return "8-30D"
-        elif days <= 60:
-            return "30-60D"
-        elif days <= 90:
-            return "60-90D"
-        else:
-            return "90D+"
+        for bucket, max_days in TENOR_BUCKETS.items():
+            if days <= max_days:
+                return bucket
+        # Fallback (should never be reached because 90D+ catches everything)
+        return "90D+"
 
     # ------------------------------------------------------------------------
     # Quote Generation (Live Tick)
