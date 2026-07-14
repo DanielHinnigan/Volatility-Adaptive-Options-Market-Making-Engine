@@ -23,7 +23,7 @@ import pandas as pd
 from ..data.base_connector import DataConnector, OptionQuote
 from ..data.lob_snapshot import LOBSnapshot, EXPECTED_COLUMNS
 
-from ...scripts.collect_bid_ask_data import INTERVAL_SECONDS
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class HistoricalConnector(DataConnector):
         if self._current_timestamp not in self._snapshots:
             # Find the closest timestamp (within 1 minute tolerance)
             closest = min(self._timestamps, key=lambda t: abs((t - self._current_timestamp).total_seconds()))
-            if abs((closest - self._current_timestamp).total_seconds()) < INTERVAL_SECONDS:
+            if abs((closest - self._current_timestamp).total_seconds()) < settings.LOB_INTERVAL_SECONDS:
                 self._current_timestamp = closest
                 logger.debug(f"Using closest timestamp: {closest}")
             else:
@@ -123,7 +123,7 @@ class HistoricalConnector(DataConnector):
 
         # Find the closest timestamp within 1 minute tolerance
         closest = min(self._timestamps, key=lambda t: abs((t - timestamp).total_seconds()))
-        if abs((closest - timestamp).total_seconds()) < INTERVAL_SECONDS:
+        if abs((closest - timestamp).total_seconds()) < settings.LOB_INTERVAL_SECONDS:
             self._current_timestamp = closest
             logger.debug(f"Using closest timestamp: {closest} (requested: {timestamp})")
         else:

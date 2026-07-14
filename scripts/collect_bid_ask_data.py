@@ -35,13 +35,14 @@ from typing import List, Dict, Any
 
 # Import the data structures to keep the column definitions in sync
 from src.data.lob_snapshot import EXPECTED_COLUMNS
+from src.config import settings
 
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 
 SYMBOL = "SPY"
-INTERVAL_SECONDS = 60  # Poll every minute
+INTERVAL_SECONDS = settings.LOB_INTERVAL_SECONDS
 OUTPUT_DIR = Path("data/lob_history")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
