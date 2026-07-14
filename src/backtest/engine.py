@@ -27,7 +27,7 @@ from ..quoting.lucic_tse import LucicTseQuotingEngine, Quote
 from ..risk.risk_manager import RiskManager, RiskStatus
 from ..utils.time_utils import compute_time_to_expiry
 from ..data.option_spec import OptionSpec
-from ..data.lob_snapshot import LOBSnapshot, LOBQuote
+from ..data.lob_snapshot import LOBSnapshot, LOBQuote, EXPECTED_COLUMNS
 from ..data.historical_connector import HistoricalConnector
 
 logger = logging.getLogger(__name__)
@@ -144,7 +144,7 @@ class Backtester:
         df = pd.read_parquet(data_path)
         df['timestamp'] = pd.to_datetime(df['timestamp'])
 
-        required_cols = LOBSnapshot.EXPECTED_COLUMNS
+        required_cols = EXPECTED_COLUMNS
         missing = set(required_cols) - set(df.columns)
         if missing:
             raise ValueError(f"Missing required columns in LOB data: {missing}")

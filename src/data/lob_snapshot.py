@@ -10,6 +10,22 @@ from datetime import datetime
 from typing import Optional, Dict, List
 import pandas as pd
 
+# The expected columns for the DataFrame passed to from_dataframe()
+EXPECTED_COLUMNS: List[str] = [
+    'timestamp',
+    'spot_price',
+    'expiry',
+    'strike',
+    'type',
+    'bid',
+    'ask',
+    'bid_size',
+    'ask_size',
+    'volume',
+    'open_interest',
+    'implied_vol',
+    'last_price',
+]
 
 @dataclass(frozen=True)
 class LOBQuote:
@@ -31,23 +47,6 @@ class LOBSnapshot:
 
     Contains the spot price and quotes for all options.
     """
-
-    # The expected columns for the DataFrame passed to from_dataframe()
-    EXPECTED_COLUMNS: List[str] = [
-        'timestamp',
-        'spot_price',
-        'expiry',
-        'strike',
-        'type',
-        'bid',
-        'ask',
-        'bid_size',
-        'ask_size',
-        'volume',
-        'open_interest',
-        'implied_vol',
-        'last_price',
-    ]
 
     timestamp: datetime
     spot: float

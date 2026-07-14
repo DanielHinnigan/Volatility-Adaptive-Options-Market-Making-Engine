@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from ..data.base_connector import DataConnector, OptionQuote
-from ..data.lob_snapshot import LOBSnapshot
+from ..data.lob_snapshot import LOBSnapshot, EXPECTED_COLUMNS
 
 from ...scripts.collect_bid_ask_data import INTERVAL_SECONDS
 
@@ -46,8 +46,7 @@ class HistoricalConnector(DataConnector):
         Initialize the historical connector.
 
         Args:
-            data: The LOB DataFrame (must contain columns matching
-                  LOBSnapshot.EXPECTED_COLUMNS).
+            data: The LOB DataFrame (must contain columns matching EXPECTED_COLUMNS).
             initial_timestamp: Optional starting timestamp. If None, uses the
                                first timestamp in the data.
 
@@ -96,7 +95,7 @@ class HistoricalConnector(DataConnector):
 
     def _validate_data(self, data: pd.DataFrame) -> None:
         """Ensure the data has the columns expected by LOBSnapshot."""
-        required_cols = LOBSnapshot.EXPECTED_COLUMNS
+        required_cols = EXPECTED_COLUMNS
         missing = set(required_cols) - set(data.columns)
         if missing:
             raise ValueError(
