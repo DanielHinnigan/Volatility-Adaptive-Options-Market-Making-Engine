@@ -63,11 +63,11 @@ class LOBSnapshot:
             raise ValueError("Cannot create LOBSnapshot from empty DataFrame")
 
         # Enforce the data contract
-        missing = set(cls.EXPECTED_COLUMNS) - set(df.columns)
+        missing = set(EXPECTED_COLUMNS) - set(df.columns)
         if missing:
             raise ValueError(
                 f"Missing required columns in LOB data: {missing}. "
-                f"Expected: {cls.EXPECTED_COLUMNS}"
+                f"Expected: {EXPECTED_COLUMNS}"
             )
 
         timestamp = df['timestamp'].iloc[0]
@@ -77,7 +77,7 @@ class LOBSnapshot:
         spot = float(df['spot_price'].iloc[0])
 
         # Filter to only the expected columns (ignores extra columns)
-        return cls(timestamp=timestamp, spot=spot, _data=df[cls.EXPECTED_COLUMNS])
+        return cls(timestamp=timestamp, spot=spot, _data=df[EXPECTED_COLUMNS])
 
     def get_quote(self, expiry: str, strike: float, option_type: str) -> Optional[LOBQuote]:
         """
