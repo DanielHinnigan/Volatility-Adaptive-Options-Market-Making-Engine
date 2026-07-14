@@ -293,7 +293,7 @@ class Backtester:
         # 1. Handle Delta Excess (Simple: Buy/Sell Underlying)
         if risk_status.excess_delta != 0:
             spot = self.pricing_engine.get_spot()
-            shares_to_trade = -risk_status.excess_delta  # Negative = sell, Positive = buy
+            shares_to_trade = risk_status.excess_delta  # Negative excess delta = BUY underlying ; Positive excess delta = SELL underlying to create delta neutral portfolio.
 
             cash_delta = shares_to_trade * spot
             cash_delta -= self.transaction_cost_per_contract * abs(shares_to_trade)  # Underlying commission
@@ -460,6 +460,7 @@ class Backtester:
                     ))
 
             if not valid_specs:
+                logger.warning(f"valid_specs is EMPTY for timestamp {timestamp}! Skipping...")
                 continue
 
             # 2.3 Get current positions: How long/short is the bot w.r.t each of the specified options
@@ -474,6 +475,26 @@ class Backtester:
 
             if risk_status.halted:
                 self._unwind_excess_risk(risk_status, timestamp, snapshot)
+
+                # 2. Record a snapshot (so the equity curve isn't empty)
+                #    We need to get the current inventory and Greeks even when halted.
+                #    We can reuse the existing positions and Greeks from the last state.
+                #    For simplicity, we can record a snapshot with the current state.
+                inventory_greeks = self.quoting_engine.aggregate_inventory(positions, valid_specs)
+                
+                self._inventory_history.append(InventorySnapshot(
+                    timestamp=timestamp,
+                    positions=dict(self._positions),
+                    cash=self._cash,
+                    total_pnl=self._mark_to_market({}),  # No fair values, just cash-based PnL
+                    realized_pnl=self._daily_pnl,
+                    unrealized_pnl=0.0,  # No mark-to-market on halted state
+                    delta=inventory_greeks.delta,
+                    gamma=inventory_greeks.gamma,
+                    vega=inventory_greeks.vega,
+                    theta=inventory_greeks.theta,
+                ))
+                
                 continue
 
             # 2.5 Process each quote and simulate fills
@@ -537,7 +558,7 @@ class Backtester:
             unrealized_pnl = total_pnl - realized_pnl
 
             # Update PnL of risk manager
-            self._update_pnl = self._daily_pnl - self.previous_daily_pnl
+            self._update_pnl = self._daily_pnl - self._previous_daily_pnl
             self._previous_daily_pnl = self._daily_pnl
 
             # 2.7 Get Greeks for the current inventory
