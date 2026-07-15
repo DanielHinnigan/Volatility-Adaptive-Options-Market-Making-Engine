@@ -26,6 +26,7 @@ if str(project_root) not in sys.path:
 # Imports
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import time
 import logging
 from datetime import datetime, timedelta
@@ -145,17 +146,21 @@ def collect_snapshot(ticker: yf.Ticker) -> pd.DataFrame:
             logger.warning("No expiries available. Market might be closed or data missing.")
             return pd.DataFrame()
 
+        # Need to save the timestamp outside the loop as otherwise it will change by a few ms inside the loop and create disjoint snapshots for the same snapshot
+        timestamp = datetime.now(ZoneInfo("US/Eastern")).isoformat()
         for exp in expiries:
             chain = ticker.option_chain(exp)
             for df, opt_type in [(chain.calls, "call"), (chain.puts, "put")]:
                 for _, row in df.iterrows():
                     # Skip if bid/ask are zero (stale or no market)
-                    if row.get("bid", 0) <= 0 and row.get("ask", 0) <= 0:
+                    if row.get("bid", 0) <= 0 or row.get("ask", 0) <= 0:
+                        continue
+                    if np.isnan(row.get("bid", 0)) or np.isnan(row.get("ask", 0)):
                         continue
 
                     # Build the record using the schema from LOBSnapshot
                     record = {
-                        "timestamp": datetime.now(ZoneInfo("US/Eastern")).isoformat(),
+                        "timestamp": timestamp,
                         "spot_price": spot_price,
                         "expiry": exp,
                         "strike": row["strike"],
@@ -174,7 +179,6 @@ def collect_snapshot(ticker: yf.Ticker) -> pd.DataFrame:
                             record[col] = 0
 
                     records.append(record)
-
         if not records:
             logger.warning("No valid option records found (possibly a market holiday).")
             return pd.DataFrame()
@@ -189,6 +193,9 @@ def collect_snapshot(ticker: yf.Ticker) -> pd.DataFrame:
 
         # Reorder columns to match the expected order
         df = df[EXPECTED_COLUMNS]
+        
+        # yfinance reports 0 as NaN, so change to 0
+        df = df.fillna(0)
 
         return df
 
