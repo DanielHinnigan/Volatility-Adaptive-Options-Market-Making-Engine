@@ -19,6 +19,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 import pandas as pd
+import numpy as np
 
 from ..data.base_connector import DataConnector, OptionQuote
 from ..data.lob_snapshot import LOBSnapshot, EXPECTED_COLUMNS
@@ -177,16 +178,22 @@ class HistoricalConnector(DataConnector):
         puts = []
 
         for _, row in rows.iterrows():
-            bid = float(row['bid'])
-            ask = float(row['ask'])
+            # Handle NaN values: NaN occurs when fetching values of 0 in yfinance
+            bid = 0.0 if pd.isna(row.get("bid", 0.0)) else float(row["bid"])
+            ask = 0.0 if pd.isna(row.get("ask", 0)) else float(row["ask"])
+            volume = 0 if pd.isna(row.get("volume", 0)) else int(row["volume"])
+            open_interest = 0 if pd.isna(row.get("open_interest", 0)) else int(row["open_interest"])
+            implied_vol = 0.0 if pd.isna(row.get("implied_vol", 0)) else float(row["implied_vol"])
+
+            # Create quote
             quote = OptionQuote(
                 strike=float(row['strike']),
                 bid=bid,
                 ask=ask,
                 mid=(bid + ask) / 2,
-                implied_vol=float(row.get('implied_vol', 0.0)),
-                volume=int(row.get('volume', 0)),
-                open_interest=int(row.get('open_interest', 0)),
+                implied_vol=implied_vol,
+                volume=volume,
+                open_interest=open_interest,
                 option_type=str(row['type'])
             )
             if row['type'] == 'call':

@@ -28,7 +28,7 @@ from ..risk.risk_manager import RiskManager, RiskStatus
 from ..utils.time_utils import compute_time_to_expiry
 from ..data.option_spec import OptionSpec
 from ..data.lob_snapshot import LOBSnapshot, LOBQuote, EXPECTED_COLUMNS
-from ..data.historical_connector import HistoricalConnector
+from .historical_connector import HistoricalConnector
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,8 @@ class Backtester:
     ):
         """
         Initialize the backtester.
+        The backtester automatically sets the connector to a special-designed connector
+        to allow for replay of historical data.
 
         Args:
             pricing_engine: The PricingEngine instance (must be calibrated).
@@ -462,6 +464,12 @@ class Backtester:
             if not valid_specs:
                 logger.warning(f"valid_specs is EMPTY for timestamp {timestamp}! Skipping...")
                 continue
+
+            # Update quotes
+            self.quoting_engine.update_state(
+                spot=spot,
+                option_specs=valid_specs
+            )
 
             # 2.3 Get current positions: How long/short is the bot w.r.t each of the specified options
             positions = {opt_id: self._positions.get(opt_id, 0) for opt_id in self._spec_map.keys()}
