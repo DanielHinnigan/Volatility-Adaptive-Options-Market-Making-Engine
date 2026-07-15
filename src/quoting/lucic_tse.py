@@ -51,7 +51,7 @@ from scipy.linalg import inv
 from scipy.special import erf
 
 from ..pricing_engine import PricingEngine
-from ..models.bsm import black_scholes_call, black_scholes_put
+from ..data.option_spec import OptionSpec
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class LucicTseQuotingEngine:
         auto_update: bool = True,
         update_interval_ms: int = 200,
         initial_realized_vol: Optional[float] = None,
-        option_specs: Optional[List[Dict]] = None,
+        option_specs: Optional[List[OptionSpec]] = None,
     ):
         """
         Initialize the quoting engine.
@@ -402,7 +402,7 @@ class LucicTseQuotingEngine:
         self,
         spot: Optional[float] = None,
         realized_vol_estimate: Optional[float] = None,
-        option_specs: Optional[List[Dict]] = None,
+        option_specs: Optional[List[OptionSpec]] = None,
     ) -> None:
         """
         Manually trigger a state update (for testing, or if auto_update=False).
@@ -430,7 +430,7 @@ class LucicTseQuotingEngine:
         self,
         spot: float,
         realized_vol_estimate: float,
-        option_specs: List[Dict],
+        option_specs: List[OptionSpec],
     ) -> None:
         """
         Internal state update (called by background thread or manually).
@@ -452,10 +452,10 @@ class LucicTseQuotingEngine:
 
         for spec in option_specs:
             try:
-                iv = self.pricing_engine.get_iv(spec['strike'], spec['expiry'], use_sabr=True)
+                iv = self.pricing_engine.get_iv(spec.strike, spec.expiry, use_sabr=True)
             except (RuntimeError, ValueError) as e:
                 logger.error(
-                    f"PricingEngine error for {spec.get('id')} (Strike={spec['strike']}, Expiry={spec['expiry']}): {e}. "
+                    f"PricingEngine error for {spec.id} (Strike={spec.strike}, Expiry={spec.expiry}): {e}. "
                     "Skipping this option from Lucic-Tse state update."
                 )
                 continue
@@ -463,9 +463,9 @@ class LucicTseQuotingEngine:
             # Compute Greeks for this option
             greeks = self._compute_single_option_greeks(
                 spot=spot,
-                strike=spec['strike'],
-                T=spec['T'],
-                option_type=spec['option_type'],
+                strike=spec.strike,
+                T=spec.T,
+                option_type=spec.option_type,
                 iv=iv,
             )
 
@@ -527,7 +527,7 @@ class LucicTseQuotingEngine:
         self._is_initialized = True
         logger.debug(f"State updated with {self._N} valid options.")
 
-    def _get_per_option(self, key: str, option_specs: List[Dict]) -> np.ndarray:
+    def _get_per_option(self, key: str, option_specs: List[OptionSpec]) -> np.ndarray:
         """Extract per-option parameters (lambda0, kappa) from order_flow_params."""
         base = self.order_flow_params.get(key)
         N = len(option_specs)
@@ -547,7 +547,7 @@ class LucicTseQuotingEngine:
 
     def _build_risk_matrix_A(
         self,
-        option_specs: List[Dict],
+        option_specs: List[OptionSpec],
         greeks_list: List[Dict]
     ) -> np.ndarray:
         """
@@ -662,14 +662,14 @@ class LucicTseQuotingEngine:
     def aggregate_inventory(
         self,
         positions: Dict[str, int],
-        option_specs: List[Dict],
+        option_specs: List[OptionSpec],
     ) -> InventoryGreeks:
         """
         Aggregate Greeks from current positions.
 
         Args:
             positions: Dict of {option_id: quantity}.
-            option_specs: List of option specs (must include 'id').
+            option_specs: List of option specs.
 
         Returns:
             InventoryGreeks: Aggregated Greeks.
@@ -678,7 +678,7 @@ class LucicTseQuotingEngine:
         spot = self.pricing_engine.get_spot()
 
         # Parameters to return
-        spec_map = {spec.get('id'): spec for spec in option_specs}
+        spec_map = {spec.id: spec for spec in option_specs}
         delta_total = 0.0
         gamma_total = 0.0
         vega_total = 0.0
@@ -696,16 +696,16 @@ class LucicTseQuotingEngine:
 
             # Compute Greeks for this option
             try:
-                iv = self.pricing_engine.get_iv(spec['strike'], spec['expiry'], use_sabr=True)
+                iv = self.pricing_engine.get_iv(spec.strike, spec.expiry, use_sabr=True)
             except (RuntimeError, ValueError) as e:
                 logger.error(f"Skipping {opt_id} in inventory aggregation: {e}")
                 continue
 
             greeks = self._compute_single_option_greeks(
                 spot=spot,
-                strike=spec['strike'],
-                T=spec['T'],
-                option_type=spec['option_type'],
+                strike=spec.strike,
+                T=spec.T,
+                option_type=spec.option_type,
                 iv=iv,
             )
 
@@ -715,10 +715,10 @@ class LucicTseQuotingEngine:
             vega_total += greeks['vega'] * quantity
             theta_total += greeks['theta'] * quantity
 
-            tenor = self._get_tenor_bucket(spec['T'])
+            tenor = self._get_tenor_bucket(spec.T)
             vega_by_tenor[tenor] = vega_by_tenor.get(tenor, 0.0) + greeks['vega'] * quantity
-            delta_by_expiry[spec['expiry']] = delta_by_expiry.get(spec['expiry'], 0.0) + greeks['delta'] * quantity
-            gamma_by_expiry[spec['expiry']] = gamma_by_expiry.get(spec['expiry'], 0.0) + greeks['gamma'] * quantity
+            delta_by_expiry[spec.expiry] = delta_by_expiry.get(spec.expiry, 0.0) + greeks['delta'] * quantity
+            gamma_by_expiry[spec.expiry] = gamma_by_expiry.get(spec.expiry, 0.0) + greeks['gamma'] * quantity
 
         return InventoryGreeks(
             delta=delta_total,
@@ -806,7 +806,7 @@ class LucicTseQuotingEngine:
 
     def generate_quotes(
         self,
-        option_specs: List[Dict],
+        option_specs: List[OptionSpec],
         positions: Dict[str, int],
     ) -> Dict[str, Quote]:
         """
@@ -817,8 +817,7 @@ class LucicTseQuotingEngine:
         It also updates the internal option_specs for the background thread.
 
         Args:
-            option_specs: List of option dicts with keys:
-                'strike', 'expiry', 'T', 'option_type', 'id'.
+            option_specs: List of type OptionSpec.
             positions: Dict of {option_id: quantity} (current inventory).
 
         Returns:
@@ -829,10 +828,10 @@ class LucicTseQuotingEngine:
             valid_specs = []
             for spec in option_specs:
                 try:
-                    iv = self.pricing_engine.get_iv(spec['strike'], spec['expiry'], use_sabr=True)
+                    iv = self.pricing_engine.get_iv(spec.strike, spec.expiry, use_sabr=True)
                 except Exception as e:
                     logger.error(
-                        f"Ignoring {spec.get('id')} in portfolio: PricingEngine error: {e}. "
+                        f"Ignoring {spec.id} in portfolio: PricingEngine error: {e}. "
                         "This option will not be quoted until the PricingEngine can price it."
                     )
                     continue
@@ -850,7 +849,7 @@ class LucicTseQuotingEngine:
                 self._N = len(valid_specs)
 
             # 3. Build inventory vector q (only for valid options)
-            idx_map = {spec['id']: i for i, spec in enumerate(self._option_specs)}
+            idx_map = {spec.id: i for i, spec in enumerate(self._option_specs)}
             q_vec = np.zeros(self._N)
             for opt_id, quantity in positions.items():
                 if opt_id in idx_map:
@@ -865,17 +864,17 @@ class LucicTseQuotingEngine:
                 quotes = {}
                 for spec in valid_specs:
                     fair_value = self.pricing_engine.get_price(
-                        spec['strike'], spec['expiry'], spec['option_type'], use_sabr=True
+                        spec.strike, spec.expiry, spec.option_type, use_sabr=True
                     )
                     if np.isnan(fair_value) or fair_value <= 0:
                         continue
                     spread = fallback_spread_pct * fair_value
-                    quotes[spec['id']] = Quote(
-                        option_id=spec['id'],
-                        strike=spec['strike'],
-                        expiry=spec['expiry'],
-                        T=spec['T'],
-                        option_type=spec['option_type'],
+                    quotes[spec.id] = Quote(
+                        option_id=spec.id,
+                        strike=spec.strike,
+                        expiry=spec.expiry,
+                        T=spec.T,
+                        option_type=spec.option_type,
                         bid=max(fair_value - spread, 0.01),
                         ask=fair_value + spread,
                         bid_size=self.default_bid_size,
@@ -895,7 +894,7 @@ class LucicTseQuotingEngine:
             for i, spec in enumerate(valid_specs):
                 # Fair value
                 fair_value = self.pricing_engine.get_price(
-                    spec['strike'], spec['expiry'], spec['option_type'], use_sabr=True
+                    spec.strike, spec.expiry, spec.option_type, use_sabr=True
                 )
                 if np.isnan(fair_value) or fair_value <= 0:
                     continue
@@ -910,12 +909,12 @@ class LucicTseQuotingEngine:
                 bid = max(fair_value - bid_spread, 0.01)
                 ask = fair_value + ask_spread
 
-                quotes[spec['id']] = Quote(
-                    option_id=spec['id'],
-                    strike=spec['strike'],
-                    expiry=spec['expiry'],
-                    T=spec['T'],
-                    option_type=spec['option_type'],
+                quotes[spec.id] = Quote(
+                    option_id=spec.id,
+                    strike=spec.strike,
+                    expiry=spec.expiry,
+                    T=spec.T,
+                    option_type=spec.option_type,
                     bid=bid,
                     ask=ask,
                     bid_size=self.default_bid_size,

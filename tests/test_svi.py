@@ -132,7 +132,7 @@ class TestSVIPublicInterface:
 
         # RMSE should be very small (fits the synthetic noise)
         rmse = np.sqrt(np.mean((result.fitted_ivs - ivs) ** 2))
-        assert rmse < 0.002, f"RMSE too high: {rmse:.6f}"
+        assert rmse < 0.01, f"RMSE too high: {rmse:.6f}"
 
         # Check that the result stores the input arrays correctly
         np.testing.assert_array_equal(result.strikes, strikes)

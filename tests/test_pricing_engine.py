@@ -1,5 +1,13 @@
+"""
+Unit tests for PricingEngine.
+
+Uses a mock connector with expiries generated relative to the current date.
+This ensures the tests are always valid and require no mocking of time.
+"""
+
 import pytest
 import numpy as np
+from datetime import datetime, timedelta
 from typing import List, Dict
 
 from src.data.base_connector import DataConnector, OptionQuote
@@ -11,24 +19,33 @@ class MockConnector(DataConnector):
 
     def __init__(self, spot=100.0, expiries=None):
         self.spot = spot
+
+        # Generate expiries relative to the current date (always in the future)
         if expiries is None:
-            expiries = ["2026-07-09", "2026-07-10", "2026-07-13"]
-        self.expiries = expiries
+            today = datetime.now().date()
+            # Use the next 3 Fridays (or just add 7, 14, 21 days)
+            self.expiries = [
+                (today + timedelta(days=7 * i)).isoformat()
+                for i in range(1, 4)
+            ]
+        else:
+            self.expiries = expiries
+
         self._chains = self._generate_chains()
 
     def _generate_chains(self):
         chains = {}
         # Simple synthetic smile: IV = 0.2 + 0.1 * (K/F - 1)^2
         for exp in self.expiries:
+            # Compute T using the same logic as the engine (we can just use 7/365 as a rough estimate)
+            # But since we're generating synthetic data, a fixed T is fine.
             T = 7 / 365  # simplified
             forward = self.spot * np.exp(0.05 * T)
             calls = []
             puts = []
             for k in range(80, 121, 2):
                 iv = 0.2 + 0.1 * ((k / forward) - 1) ** 2
-                # Create a call and put for each strike
-                mid = 10.0  # dummy price, we will compute IV from it later (or just set implied_vol)
-                # In a real mock, we can just set implied_vol directly to avoid BSM inversion
+                mid = 10.0
                 calls.append(OptionQuote(
                     strike=float(k),
                     bid=mid * 0.98,
@@ -62,16 +79,23 @@ class MockConnector(DataConnector):
         return self.spot
 
     def get_surface_data(self, max_expiries: int = 5) -> Dict:
-        # Not used in engine, but required by base class
         return {}
-    
+
+
 class TestPricingEngine:
     """Unit tests for PricingEngine using a mock connector."""
 
     @pytest.fixture
     def mock_engine(self):
         connector = MockConnector(spot=100.0)
-        engine = PricingEngine(symbol="TEST", connector=connector, r=0.05, q=0.01)
+        engine = PricingEngine(
+            symbol="TEST",
+            connector=connector,
+            r=0.05,
+            q=0.01,
+            max_expiries=3,
+            cache=False,
+        )
         return engine
 
     def test_initialization(self, mock_engine):
@@ -87,14 +111,14 @@ class TestPricingEngine:
 
     def test_get_price(self, mock_engine):
         mock_engine._calibrate()
-        expiry = mock_engine.get_svi_params().keys().__iter__().__next__()
+        expiry = next(iter(mock_engine.get_svi_params().keys()))
         price = mock_engine.get_price(strike=100.0, expiry=expiry, option_type="call")
         assert isinstance(price, float)
         assert price > 0
 
     def test_get_atm_iv(self, mock_engine):
         mock_engine._calibrate()
-        expiry = mock_engine.get_svi_params().keys().__iter__().__next__()
+        expiry = next(iter(mock_engine.get_svi_params().keys()))
         atm_iv = mock_engine.get_atm_iv(expiry)
         assert isinstance(atm_iv, float)
         assert atm_iv > 0

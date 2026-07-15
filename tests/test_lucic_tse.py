@@ -13,6 +13,7 @@ from src.quoting.lucic_tse import (
     InventoryGreeks,
 )
 from src.models.bsm import black_scholes_call, black_scholes_put
+from src.data.option_spec import OptionSpec
 
 
 # ============================================================================
@@ -99,9 +100,9 @@ def order_flow_params():
 @pytest.fixture
 def option_specs():
     return [
-        {'id': 'C_100', 'strike': 100, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'},
-        {'id': 'C_105', 'strike': 105, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'},
-        {'id': 'C_95', 'strike': 95, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'},
+        OptionSpec(**{'id': 'C_100', 'strike': 100, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'}),
+        OptionSpec(**{'id': 'C_105', 'strike': 105, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'}),
+        OptionSpec(**{'id': 'C_95', 'strike': 95, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'}),
     ]
 
 @pytest.fixture
@@ -155,8 +156,8 @@ class TestLucicTseStateUpdate:
 
         with patch.object(mock_pricing_engine, 'get_iv', side_effect=mock_get_iv_raises):
             option_specs = [
-                {'id': 'C_100', 'strike': 100, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'},
-                {'id': 'C_105', 'strike': 105, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'},
+                OptionSpec(**{'id': 'C_100', 'strike': 100, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'}),
+                OptionSpec(**{'id': 'C_105', 'strike': 105, 'expiry': '2026-01-01', 'T': 30/365, 'option_type': 'call'}),
             ]
             quoting_engine.update_state(
                 spot=100,
@@ -272,8 +273,8 @@ class TestLucicTseRiskMatrix:
         """
         # 1. Define a small, controlled set of options
         option_specs = [
-            {'id': 'A', 'strike': 100, 'expiry': '2026-01-01', 'T': 0.5, 'option_type': 'call'},
-            {'id': 'B', 'strike': 105, 'expiry': '2026-01-01', 'T': 0.5, 'option_type': 'call'},
+            OptionSpec(**{'id': 'A', 'strike': 100, 'expiry': '2026-01-01', 'T': 0.5, 'option_type': 'call'}),
+            OptionSpec(**{'id': 'B', 'strike': 105, 'expiry': '2026-01-01', 'T': 0.5, 'option_type': 'call'}),
         ]
 
         # 2. Define the corresponding greeks (we control these values - only vega should be used for calculations)

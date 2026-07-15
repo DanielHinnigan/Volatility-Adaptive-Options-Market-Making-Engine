@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
 from ..quoting.lucic_tse import LucicTseQuotingEngine, InventoryGreeks, Quote, TENOR_BUCKETS
+from ..data.option_spec import OptionSpec
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ class RiskManager:
 
     def get_quotes(
         self,
-        option_specs: List[Dict],
+        option_specs: List[OptionSpec],
         positions: Dict[str, int],
         update_pnl: Optional[float] = None,
     ) -> RiskStatus:
