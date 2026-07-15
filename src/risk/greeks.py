@@ -1,1 +1,0 @@
-# Implementation of the greeks (Delta, Gamma, Vega, Theta) aggregated across the portfolio

@@ -1,1 +1,0 @@
-# Calculation of reservation prices
